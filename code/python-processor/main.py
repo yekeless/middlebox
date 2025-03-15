@@ -16,8 +16,9 @@ async def run():
         packet = Ether(data)
         print(packet.show())
         # Publish the received message to outpktsec and outpktinsec
-        #delay = random.expovariate(1 / 5e-6)
-        #await asyncio.sleep(delay)
+        delay = random.expovariate(1 / 1e-3)
+        await asyncio.sleep(delay)
+        print(f"Delay: {delay}")
         if subject == "inpktsec":
             await nc.publish("outpktinsec", msg.data)
         else:
@@ -26,7 +27,8 @@ async def run():
     # Subscribe to inpktsec and inpktinsec topics
     await nc.subscribe("inpktsec", cb=message_handler)
     await nc.subscribe("inpktinsec", cb=message_handler)
-
+    # await nc.subscribe("outpktsec", cb=message_handler)
+    # await nc.subscribe("outpktinsec", cb=message_handler)
     print("Subscribed to inpktsec and inpktinsec topics")
 
     try:
