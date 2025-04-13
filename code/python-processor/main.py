@@ -1,7 +1,7 @@
 import asyncio
 from nats.aio.client import Client as NATS
 import os, random
-from scapy.all import Ether
+from scapy.all import Ether, IP, TCP
 
 async def run():
     nc = NATS()
@@ -11,24 +11,42 @@ async def run():
 
     async def message_handler(msg):
         subject = msg.subject
-        data = msg.data #.decode()
-        #print(f"Received a message on '{subject}': {data}")
-        packet = Ether(data)
-        print(packet.show())
-        # Publish the received message to outpktsec and outpktinsec
-        delay = random.expovariate(1 / 1e-3)
-        await asyncio.sleep(delay)
-        print(f"Delay: {delay}")
-        if subject == "inpktsec":
-            await nc.publish("outpktinsec", msg.data)
-        else:
-            await nc.publish("outpktsec", msg.data)
-   
+        data = msg.data  # This is the raw packet data
+        print(f"Received message on '{subject}'")
+        
+        try:
+            # Parse the raw bytes as an Ethernet frame
+            packet = Ether(data)  # Scapy Ether layer parsing
+            print(f"Parsed Packet:\n{packet.show()}")  # Display the parsed packet
+
+            # Add random delay
+            delay = random.expovariate(1 / 10e-3)
+            await asyncio.sleep(delay)
+            print(f"Applied delay: {delay}s")
+            
+            # Check if the packet contains IP and TCP layers
+            if IP in packet and TCP in packet:
+                if subject == "inpktsec":
+                    # Modify the packet if necessary
+                    # For example, change the source IP or port, etc.
+                    print(f"Packet from {packet[IP].src}:{packet[TCP].sport} to {packet[IP].dst}:{packet[TCP].dport}")
+                    
+                    # Publish the modified packet to the next topic
+                    await nc.publish("outpktinsec", bytes(packet))  # Send packet to outpktinsec
+
+                elif subject == "inpktinsec":
+                    # Similarly handle the inpktinsec messages
+                    print(f"Packet from {packet[IP].src}:{packet[TCP].sport} to {packet[IP].dst}:{packet[TCP].dport}")
+                    
+                    # Publish the modified packet to the next topic
+                    await nc.publish("outpktsec", bytes(packet))  # Send packet to outpktsec
+
+        except Exception as e:
+            print(f"Error parsing packet: {e}")
+
     # Subscribe to inpktsec and inpktinsec topics
     await nc.subscribe("inpktsec", cb=message_handler)
     await nc.subscribe("inpktinsec", cb=message_handler)
-    # await nc.subscribe("outpktsec", cb=message_handler)
-    # await nc.subscribe("outpktinsec", cb=message_handler)
     print("Subscribed to inpktsec and inpktinsec topics")
 
     try:
